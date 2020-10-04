@@ -1,0 +1,119 @@
+
+It was not clear for me what type of Windows Appplication it should be and I decided to use Windows Forms Application.
+The workflow is very simple. User can select multiple files by clicking the 'Select File' button on UI.
+Process of the file data mapping starts automaticaly and if files are correct it should change parameters in App.Config
+The result of most recent App.Config parameters should be displayed on the UI. Results on a left side, red error messages on the right.
+
+Development
+
+In order to work with configuration file I added System.Configuration.ConfigurationManager references to project.
+First I created Base Config class(ConfigEntry). 
+Based on Input files provided I created properties. 
+After first few tries to map Text I realized that Property Data types can be different (string, int, TimeSpan).
+Decided to create SettingEntry class with some properties. Name as ID (string) and Vlue (object), thougt will convert object value to some particular type whe doing validation.
+Only 2 action triggers: 
+-'Select' button- selects file, reads data, creates a list of found/possible settings and pass it to Validation.
+-'Display All' checkbox - refresh view.
+
+The trickiest part of this assignment was the Validation. Also the data extraction from the files, but mostly with Time part. 
+	
+ 
+Workflow Plan 1
+
+1.Start
+-Instansiate(); 
+-GetListOfBaseNames (for filtering data on UI); 
+-DisplayMostRecentSettings();
+
+2.Upload and Read File/Files
+-For Each File selected run ReadFile(file);
+-Add all found SettingEntry to a global list (settingsFoundInFilesList).
+-Use 'settingsFoundInFilesList' to Validate and to CREATE/UPDATE configFile (based on checkBoxes).
+-Refresh the view.
+
+User interface is very simple. There are only uploader and 2 checkBox corntrols. 
+User by default can see just Base Config settings. 
+All App.Config settings can be displayed if Display All checkBox is checked.
+Add New check box is there to Create new Settings if it passes validation.
+
+File Reader
+
+Do do all data processing actions I created 'ProcessHandler' class and placed all methods in it.
+It is posible to upload multiple files. Files should have more or less very same format.
+Code reads text line by line and removes part of text or even lines based on some symbols (/t, ==,-).
+This helped to map values in a text. I still had dificulties mapping Time, because I used ':' as delimeter.
+It was not the best idea to use 'keyRegex = new Regex("(.*):.*");' 
+But using StringBuilder I replace firts index of ':' with '!'.
+
+Validation
+
+To validate values and display some Error message I used 'baseSettingNameList' list
+that contains only Names of Base settings. It contains only Property Name that exist in
+ConfigEntry class (used for global access). 
+var allBaseSettings = configEntry.GetType().GetProperties();
+
+During the validation code is checking if Key value exist in 'settingsFoundInFilesList'
+and 'baseSettingNameList'. If this condition fails code displays the error text.
+-- notFoundMsgText += baseSetting + " - " + "COULD NOT BE FOUND" + '\n' + '\n';
+also it says that the value was left 'Unchanged'.
+The is a line of code to change value to 'empty' and then it would display
+the same message but 'keyName : ERROR' but I commented out that line.
+I think Base values should remain unchanged if not found.
+
+Settings in the file might be of various data types. To work around this, I created SettingEntry 
+class and Get;Set; datatype is 'Object'.
+
+Using FOREACH loop code loops through 'settingsFoundInFilesList'.
+
+First Key must exist in App.Config file. There is a method for that: 'ProcessHandler.ConfigKeyExists(string strKey)'
+If it DOES NOT EXIST and the 'Add New' check box is not checked it will display message that such a Key doesn't exist.
+If the 'Add New' is checked it then will create a new Key with empty value.
+This value than is in a next step of validation.
+
+Value validation is triggerd if ConfigKeyExists = true. The result of this method 
+is used in IF()
+
+While in loop code passes each KeyName, Object value as string,  Key Value as string
+to 'ProcessHandler.ValidateByType(settingKey, objValueStr, null);'
+Object Value and KeyValue are used for some condition inside 'ValidateByType'.
+Object value is set to NULL if the KeyName is not a part of BASE configs.
+If Object value is NOT NULL or empty it then must meet some validation rules.
+This rule is specified in 'BaseValidationRules()'. Basicaly it sets what data type the Object value must be. This is 
+based on what data type is Get; Set; in ConfigEntry class.
+
+Validation is simple and it is hard coded.
+To get the correct object name code passes KeyValue to 'ParseString(value);'
+This retuns the value as Opject. Then strin with value of Object.getType().Name is passed to
+a SWITCH statment and based on case (objectType) it generates the part of validation message.
+This message is then used for further process.
+For STRING validation I used 'Regex.IsMatch(valueInput, @"^[a-zA-Z]+$")) ' to check if it containes any non alphabet chars
+but this might be wrong if in some cases it should contain it. 
+
+
+CREATE / UPDATE
+
+If Base config setting passes the validation the code assigns the value to a global 
+instance of ConfigEntry. 
+			if (settingKey == "NumberOfSystems")
+                            configEntry.NumberOfSystems = Convert.ToInt32(valueObj);
+                        if (settingKey == "OrdersPerHour")
+                            configEntry.OrdersPerHour = Convert.ToInt32(valueObj);
+                        if (settingKey == "OrderLinesPerOrder")
+                            configEntry.OrderLinesPerOrder = Convert.ToInt32(valueObj);
+                        if (settingKey == "ResultStartTime")
+                            configEntry.ResultStartTime = TimeSpan.Parse(objValueStr);
+
+and then updates the values in App.Config file. It gets saved there as string.
+
+Other Key Setting values are assigned in this loop too and saved as strings in App.Config.
+
+Having this globaly accessible variable 'configEntry' and most recent values code can do some colculations. 
+I created a ReadAllSettings() method and it gets invoked when program starts.
+I did not use any method to get a Single Key value but this is easy. 
+Similar aproach to ConfigKeyExists() could be used with diferent return type.
+I simply did not need for any of my processes.
+Such a method then could be used when
+asignig values. In update process values are updated in runtime and by passing a KeyName to such a method
+values can  be retrieved, compared and re-assigned.
+
+
